@@ -331,7 +331,8 @@ tr.anulada-row td{opacity:.55}tr.anulada-row{background:#fff5f5!important}
     <button class="btn btn-secondary" onclick="toggleSelectAll()"><i class="fa-solid fa-check-double"></i> Sel. Todos</button>
     <button class="btn btn-warning" onclick="printBarcodes()"><i class="fa-solid fa-barcode"></i> Códigos</button>
     <button class="btn btn-warning" onclick="openLabelsModal()"><i class="fa-solid fa-tag"></i> Etiquetas</button>
-    <button class="btn btn-success" onclick="generateCatalogPDF()" style="background:var(--electric);color:#fff"><i class="fa-solid fa-file-pdf"></i> Catálogo PDF</button>
+    <button class="btn btn-success" onclick="generateCatalogPDF(true)" style="background:var(--electric);color:#fff"><i class="fa-solid fa-file-pdf"></i> Catálogo c/ Precio</button>
+    <button class="btn btn-success" onclick="generateCatalogPDF(false)" style="background:var(--electric-dark);color:#fff"><i class="fa-solid fa-file-pdf"></i> Catálogo s/ Precio</button>
     <button class="btn btn-excel" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Exportar Inventario</button>
     <label class="btn btn-success" style="cursor:pointer"><i class="fa-solid fa-file-import"></i> Importar CSV<input type="file" id="import-file" accept=".csv" style="display:none" onchange="importExcel(this)"></label>
     <div class="toolbar-right" style="font-size:11.5px;color:var(--text-mid)">Mostrando <strong id="prod-count">0</strong> / <strong id="prod-total-count">0</strong></div>
@@ -1541,7 +1542,7 @@ function previewProdImage(input){
   reader.readAsDataURL(file);
 }
 
-async function generateCatalogPDF(){
+async function generateCatalogPDF(withPrice){
   var ids=getSelectedProducts();
   if(!ids.length){toast('Selecciona al menos un producto','error');return}
   var prods=productosCache.filter(function(p){return ids.includes(p.id)});
@@ -1619,10 +1620,12 @@ async function generateCatalogPDF(){
       });
 
       // Price
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(33, 28, 184);
-      doc.text(fmt(p.precio_venta), centerX, textY + 12, {align: 'center'});
+      if (withPrice) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(33, 28, 184);
+        doc.text(fmt(p.precio_venta), centerX, textY + 12, {align: 'center'});
+      }
 
       colIdx++;
       if(colIdx >= cols) {

@@ -213,6 +213,19 @@ app.get('/api/ventas/resumen/:fecha', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET venta por folio
+app.get('/api/ventas/:folio', async (req, res) => {
+  try {
+    const [ventas] = await pool.query('SELECT * FROM ventas WHERE folio=?', [req.params.folio]);
+    if (!ventas.length) return res.status(404).json({ error: 'No encontrado' });
+    const venta = ventas[0];
+    const [prods] = await pool.query('SELECT * FROM venta_productos WHERE venta_id=?', [venta.id]);
+    venta.productos = prods;
+    venta.metodos_pago = typeof venta.metodos_pago === 'string' ? JSON.parse(venta.metodos_pago||'[]') : (venta.metodos_pago||[]);
+    res.json(venta);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST crear venta
 app.post('/api/ventas', async (req, res) => {
   const conn = await pool.getConnection();
