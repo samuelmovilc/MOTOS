@@ -1572,10 +1572,11 @@ async function generateCatalogPDF(withPrice){
     doc.line(margin, y, pageWidth - margin, y);
     y += 10;
 
-    // Grid config: 2 columns
+    // Grid config: 2 columns, Max 4 items per page
     var cols = 2;
     var colWidth = (pageWidth - (margin*2) - 10) / cols; 
-    var imgHeight = 60;
+    var iw = 80; // Large 80x80mm square image
+    var imgHeight = iw;
     var blockHeight = imgHeight + 25; 
     var currentX = margin;
     var colIdx = 0;
@@ -1595,26 +1596,23 @@ async function generateCatalogPDF(withPrice){
       // Image
       if(p.imagen) {
         try {
-          // Draw image centered in the block
-          // Approximate aspect ratio (square for now)
-          var iw = 50;
           doc.addImage(p.imagen, 'JPEG', centerX - (iw/2), y, iw, iw, undefined, 'FAST');
         } catch(e) {}
       } else {
         doc.setFillColor(240, 240, 240);
-        doc.rect(centerX - 25, y, 50, 50, 'F');
+        doc.rect(centerX - (iw/2), y, iw, iw, 'F');
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.setTextColor(150, 150, 150);
-        doc.text("Sin foto", centerX, y + 25, {align: 'center'});
+        doc.text("Sin foto", centerX, y + (iw/2), {align: 'center'});
       }
 
       // Title
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(50, 50, 50);
-      var lines = doc.splitTextToSize(p.nombre, colWidth - 10);
-      var textY = y + imgHeight - 5;
+      var lines = doc.splitTextToSize(p.nombre, colWidth - 5);
+      var textY = y + imgHeight + 5;
       lines.forEach(function(l, idx) {
         if(idx < 2) doc.text(l, centerX, textY + (idx * 5), {align: 'center'});
       });
@@ -1622,9 +1620,9 @@ async function generateCatalogPDF(withPrice){
       // Price
       if (withPrice) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
+        doc.setFontSize(15);
         doc.setTextColor(33, 28, 184);
-        doc.text(fmt(p.precio_venta), centerX, textY + 12, {align: 'center'});
+        doc.text(fmt(p.precio_venta), centerX, textY + 14, {align: 'center'});
       }
 
       colIdx++;
