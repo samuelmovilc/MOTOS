@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS configuracion (
 CREATE TABLE IF NOT EXISTS productos (
   id              VARCHAR(50) PRIMARY KEY,
   nombre          VARCHAR(300) NOT NULL,
+  imagen          LONGTEXT,
   precio_venta    DECIMAL(12,2) NOT NULL DEFAULT 0,
   precio_compra   DECIMAL(12,2) NOT NULL DEFAULT 0,
   stock           INT NOT NULL DEFAULT 0,

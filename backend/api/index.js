@@ -72,12 +72,12 @@ app.get('/api/productos/:id', async (req, res) => {
 // POST crear
 app.post('/api/productos', async (req, res) => {
   try {
-    const { id, nombre, precio_venta, precio_compra, stock } = req.body;
+    const { id, nombre, precio_venta, precio_compra, stock, imagen } = req.body;
     if (!id || !nombre || precio_venta == null || stock == null)
       return res.status(400).json({ error: 'Faltan campos' });
     await pool.query(
-      'INSERT INTO productos (id,nombre,precio_venta,precio_compra,stock,entradas,salidas) VALUES (?,?,?,?,?,?,0)',
-      [id, nombre, precio_venta, precio_compra, stock, stock]
+      'INSERT INTO productos (id,nombre,precio_venta,precio_compra,stock,entradas,salidas,imagen) VALUES (?,?,?,?,?,?,0,?)',
+      [id, nombre, precio_venta, precio_compra, stock, stock, imagen || null]
     );
     const [rows] = await pool.query('SELECT * FROM productos WHERE id=?', [id]);
     res.status(201).json(rows[0]);
@@ -90,13 +90,13 @@ app.post('/api/productos', async (req, res) => {
 // PUT actualizar
 app.put('/api/productos/:id', async (req, res) => {
   try {
-    const { nombre, precio_venta, precio_compra, stock } = req.body;
+    const { nombre, precio_venta, precio_compra, stock, imagen } = req.body;
     const [old] = await pool.query('SELECT stock, entradas FROM productos WHERE id=?', [req.params.id]);
     if (!old.length) return res.status(404).json({ error: 'No encontrado' });
     const diffE = stock > old[0].stock ? stock - old[0].stock : 0;
     await pool.query(
-      'UPDATE productos SET nombre=?, precio_venta=?, precio_compra=?, stock=?, entradas=entradas+? WHERE id=?',
-      [nombre, precio_venta, precio_compra, stock, diffE, req.params.id]
+      'UPDATE productos SET nombre=?, precio_venta=?, precio_compra=?, stock=?, entradas=entradas+?, imagen=? WHERE id=?',
+      [nombre, precio_venta, precio_compra, stock, diffE, imagen !== undefined ? imagen : null, req.params.id]
     );
     const [rows] = await pool.query('SELECT * FROM productos WHERE id=?', [req.params.id]);
     res.json(rows[0]);
@@ -136,20 +136,20 @@ app.post('/api/productos/importar', async (req, res) => {
     if (!Array.isArray(productos)) return res.status(400).json({ error: 'Array requerido' });
     let added=0, updated=0, errors=0;
     for (const p of productos) {
-      const { id, nombre, precio_venta, precio_compra, stock } = p;
+      const { id, nombre, precio_venta, precio_compra, stock, imagen } = p;
       if (!id || !nombre) { errors++; continue; }
-      const [old] = await pool.query('SELECT stock,entradas FROM productos WHERE id=?', [id]);
+      const [old] = await pool.query('SELECT stock,entradas,imagen FROM productos WHERE id=?', [id]);
       if (old.length) {
         const dE = stock > old[0].stock ? stock - old[0].stock : 0;
         await pool.query(
-          'UPDATE productos SET nombre=?,precio_venta=?,precio_compra=?,stock=?,entradas=entradas+? WHERE id=?',
-          [nombre, precio_venta, precio_compra, stock, dE, id]
+          'UPDATE productos SET nombre=?,precio_venta=?,precio_compra=?,stock=?,entradas=entradas+?,imagen=? WHERE id=?',
+          [nombre, precio_venta, precio_compra, stock, dE, imagen !== undefined ? imagen : old[0].imagen, id]
         );
         updated++;
       } else {
         await pool.query(
-          'INSERT INTO productos (id,nombre,precio_venta,precio_compra,stock,entradas,salidas) VALUES (?,?,?,?,?,?,0)',
-          [id, nombre, precio_venta, precio_compra, stock, stock]
+          'INSERT INTO productos (id,nombre,precio_venta,precio_compra,stock,entradas,salidas,imagen) VALUES (?,?,?,?,?,?,0,?)',
+          [id, nombre, precio_venta, precio_compra, stock, stock, imagen || null]
         );
         added++;
       }

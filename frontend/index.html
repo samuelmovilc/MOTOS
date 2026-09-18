@@ -331,6 +331,7 @@ tr.anulada-row td{opacity:.55}tr.anulada-row{background:#fff5f5!important}
     <button class="btn btn-secondary" onclick="toggleSelectAll()"><i class="fa-solid fa-check-double"></i> Sel. Todos</button>
     <button class="btn btn-warning" onclick="printBarcodes()"><i class="fa-solid fa-barcode"></i> Códigos</button>
     <button class="btn btn-warning" onclick="openLabelsModal()"><i class="fa-solid fa-tag"></i> Etiquetas</button>
+    <button class="btn btn-success" onclick="generateCatalogPDF()" style="background:var(--electric);color:#fff"><i class="fa-solid fa-file-pdf"></i> Catálogo PDF</button>
     <button class="btn btn-excel" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Exportar Inventario</button>
     <label class="btn btn-success" style="cursor:pointer"><i class="fa-solid fa-file-import"></i> Importar CSV<input type="file" id="import-file" accept=".csv" style="display:none" onchange="importExcel(this)"></label>
     <div class="toolbar-right" style="font-size:11.5px;color:var(--text-mid)">Mostrando <strong id="prod-count">0</strong> / <strong id="prod-total-count">0</strong></div>
@@ -344,7 +345,7 @@ tr.anulada-row td{opacity:.55}tr.anulada-row{background:#fff5f5!important}
     <div class="tbl-wrap" style="max-height:340px">
       <table><thead><tr>
         <th><input type="checkbox" id="select-all-chk" onchange="toggleSelectAll(this.checked)"></th>
-        <th>Código</th><th>Nombre</th><th>P.Venta</th><th>P.Compra</th>
+        <th>Código</th><th>Img</th><th>Nombre</th><th>P.Venta</th><th>P.Compra</th>
         <th>Stock</th><th>Entradas</th><th>Salidas</th><th>Fecha carga</th><th>Acciones</th>
       </tr></thead><tbody id="prod-body"></tbody></table>
     </div>
@@ -427,6 +428,9 @@ tr.anulada-row td{opacity:.55}tr.anulada-row{background:#fff5f5!important}
         <div class="form-group"><label>Precio compra *</label><input type="number" id="prod-precio-compra" step="0.01" min="0"></div>
         <div class="form-group"><label>Stock *</label><input type="number" id="prod-stock" min="0"></div>
         <div class="form-group"><label>Fecha carga</label><input type="date" id="prod-fecha"></div>
+        <div class="form-group"><label>Imagen (Opc. JPG/PNG)</label><input type="file" id="prod-imagen" accept="image/png, image/jpeg" onchange="previewProdImage(this)">
+          <img id="prod-imagen-preview" src="" style="display:none;max-height:40px;margin-top:5px;border-radius:4px;border:1px solid var(--border)">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1358,6 +1362,7 @@ function renderProductsTable(){
     return '<tr>'
       +'<td><input type="checkbox" class="prod-chk" value="'+p.id+'"></td>'
       +'<td style="font-size:10.5px;color:var(--text-light);white-space:nowrap">'+p.id+'</td>'
+      +'<td>'+(p.imagen?'<img src="'+p.imagen+'" style="width:24px;height:24px;object-fit:cover;border-radius:4px;border:1px solid #ddd">':'<div style="width:24px;height:24px;background:#eee;border-radius:4px"></div>')+'</td>'
       +'<td style="font-weight:600">'+p.nombre+'</td>'
       +'<td style="color:var(--electric);font-weight:700">'+fmt(pv)+'</td>'
       +'<td style="color:var(--text-mid)">'+fmt(pc)+'</td>'
@@ -1408,11 +1413,17 @@ function openProductModal(id){
     document.getElementById('prod-stock').value=p.stock;
     document.getElementById('prod-fecha').value=p.fecha_carga?p.fecha_carga.slice(0,10):todayStr();
     document.getElementById('prod-codigo').disabled=true;
+    document.getElementById('prod-imagen').value='';
+    currentProdImagen = p.imagen || null;
+    if(currentProdImagen){ document.getElementById('prod-imagen-preview').src=currentProdImagen; document.getElementById('prod-imagen-preview').style.display='block'; }
+    else{ document.getElementById('prod-imagen-preview').style.display='none'; }
   }else{
     title.innerHTML='<i class="fa-solid fa-plus"></i> Nuevo Producto';
-    ['prod-codigo','prod-nombre','prod-precio-venta','prod-precio-compra','prod-stock'].forEach(function(i){document.getElementById(i).value=''});
+    ['prod-codigo','prod-nombre','prod-precio-venta','prod-precio-compra','prod-stock','prod-imagen'].forEach(function(i){document.getElementById(i).value=''});
     document.getElementById('prod-fecha').value=todayStr();
     document.getElementById('prod-codigo').disabled=false;
+    currentProdImagen = null;
+    document.getElementById('prod-imagen-preview').style.display='none';
   }
   openModal('modal-producto');
 }
@@ -1422,14 +1433,15 @@ async function saveProduct(){
   var pv=parseFloat(document.getElementById('prod-precio-venta').value)||0;
   var pc=parseFloat(document.getElementById('prod-precio-compra').value)||0;
   var stock=parseInt(document.getElementById('prod-stock').value)||0;
+  var img = currentProdImagen;
   if(!codigo||!nombre||pv<=0||stock<0){toast('Completa los campos obligatorios','error');return}
   showLoading('Guardando...');
   try{
     if(editingProductId){
-      await apiPut('/productos/'+editingProductId,{nombre:nombre,precio_venta:pv,precio_compra:pc,stock:stock});
+      await apiPut('/productos/'+editingProductId,{nombre:nombre,precio_venta:pv,precio_compra:pc,stock:stock,imagen:img});
       toast('Producto actualizado','success');
     }else{
-      await apiPost('/productos',{id:codigo,nombre:nombre,precio_venta:pv,precio_compra:pc,stock:stock});
+      await apiPost('/productos',{id:codigo,nombre:nombre,precio_venta:pv,precio_compra:pc,stock:stock,imagen:img});
       toast('Producto agregado','success');
     }
     closeModal('modal-producto');
@@ -1502,6 +1514,132 @@ async function importExcel(input){
     hideLoading();input.value='';
   };
   reader.readAsText(file,'UTF-8');
+}
+
+var currentProdImagen = null;
+function previewProdImage(input){
+  var file = input.files[0];
+  if(!file)return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var canvas = document.createElement('canvas');
+      var maxW=600, maxH=600; // Resize to save DB space
+      var w=img.width, h=img.height;
+      if(w>maxW) { h=Math.round(h*maxW/w); w=maxW; }
+      if(h>maxH) { w=Math.round(w*maxH/h); h=maxH; }
+      canvas.width=w; canvas.height=h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      currentProdImagen = canvas.toDataURL('image/jpeg', 0.8);
+      document.getElementById('prod-imagen-preview').src = currentProdImagen;
+      document.getElementById('prod-imagen-preview').style.display='block';
+    }
+    img.src = e.target.result;
+  }
+  reader.readAsDataURL(file);
+}
+
+async function generateCatalogPDF(){
+  var ids=getSelectedProducts();
+  if(!ids.length){toast('Selecciona al menos un producto','error');return}
+  var prods=productosCache.filter(function(p){return ids.includes(p.id)});
+  
+  showLoading('Generando Catálogo PDF...');
+  try {
+    var { jsPDF } = window.jspdf;
+    var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var pageWidth = 210, pageHeight = 297;
+    var margin = 15;
+    var y = margin;
+
+    // Header
+    if(configCache.logo){
+      try{
+        doc.addImage(configCache.logo,'PNG',margin,y,40,15,undefined,'FAST');
+      }catch(e){}
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(33, 28, 184); // #211cb8
+    doc.setFontSize(22);
+    doc.text((configCache.nombre_negocio||'Catálogo').toUpperCase(), pageWidth - margin, y + 10, {align: 'right'});
+    
+    y += 20;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
+
+    // Grid config: 2 columns
+    var cols = 2;
+    var colWidth = (pageWidth - (margin*2) - 10) / cols; 
+    var imgHeight = 60;
+    var blockHeight = imgHeight + 25; 
+    var currentX = margin;
+    var colIdx = 0;
+
+    for (var i=0; i<prods.length; i++) {
+      var p = prods[i];
+
+      if (y + blockHeight > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+        currentX = margin;
+        colIdx = 0;
+      }
+
+      var centerX = currentX + (colWidth/2);
+      
+      // Image
+      if(p.imagen) {
+        try {
+          // Draw image centered in the block
+          // Approximate aspect ratio (square for now)
+          var iw = 50;
+          doc.addImage(p.imagen, 'JPEG', centerX - (iw/2), y, iw, iw, undefined, 'FAST');
+        } catch(e) {}
+      } else {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(centerX - 25, y, 50, 50, 'F');
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(150, 150, 150);
+        doc.text("Sin foto", centerX, y + 25, {align: 'center'});
+      }
+
+      // Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(50, 50, 50);
+      var lines = doc.splitTextToSize(p.nombre, colWidth - 10);
+      var textY = y + imgHeight - 5;
+      lines.forEach(function(l, idx) {
+        if(idx < 2) doc.text(l, centerX, textY + (idx * 5), {align: 'center'});
+      });
+
+      // Price
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(33, 28, 184);
+      doc.text(fmt(p.precio_venta), centerX, textY + 12, {align: 'center'});
+
+      colIdx++;
+      if(colIdx >= cols) {
+        colIdx = 0;
+        currentX = margin;
+        y += blockHeight + 5;
+      } else {
+        currentX += colWidth + 10;
+      }
+    }
+
+    doc.save('Catalogo_'+(configCache.nombre_negocio||'Motos').replace(/ /g,'_')+'.pdf');
+    toast('Catálogo PDF generado','success',3000);
+  } catch(e) {
+    toast('Error generando PDF: ' + e.message, 'error');
+  }
+  hideLoading();
 }
 
 function getSelectedProducts(){return Array.from(document.querySelectorAll('.prod-chk:checked')).map(function(c){return c.value})}
